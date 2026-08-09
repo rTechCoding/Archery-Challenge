@@ -1,1 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Real Archery Challenge - Realistic Pull</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Cinzel:wght@700&display=swap"
+        rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            background: #fdf2f8;
+        }
+
+        .game-container {
+            background: radial-gradient(circle at 20% 30%, #fff0f7 0%, #fce7f3 50%, #fbcfe8 100%);
+        }
+
+        /* Floating Score Pop animation */
+        @keyframes floatUp {
+            0% {
+                opacity: 1;
+                transform: translate(-50%, 0) scale(0.8);
+            }
+
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -35px) scale(1.25);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -70px) scale(1);
+            }
+        }
+
+        .score-pop {
+            animation: floatUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Aim helper line with glowing pulse */
+        .aim-line {
+            stroke-dasharray: 8 6;
+            animation: dash 0.6s linear infinite;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -14;
+            }
+        }
+
+        /* Pulse animation for low time */
+        @keyframes pulseWarning {
+
+            0%,
+            100% {
+                transform: scale(1);
+                color: #ef4444;
+            }
+
+            50% {
+                transform: scale(1.15);
+                color: #dc2626;
+            }
+        }
+
+        .time-warning {
+            animation: pulseWarning 0.5s infinite;
+        }
+
+        /* Shimmer effect for high score */
+        .shimmer {
+            background: linear-gradient(90deg, #f59e0b 0%, #fef08a 50%, #f59e0b 100%);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            animation: shine 2s linear infinite;
+        }
+
+        @keyframes shine {
+            to {
+                background-position: 200% center;
+            }
+        }
+
+        /* Realistic Bow Drop Shadow */
+        .bow-shadow {
+            filter: drop-shadow(4px 12px 10px rgba(0, 0, 0, 0.25));
+        }
+
+        .archery {
+            left: 30px;
+            top: 50%;
+            width: 160px;
+            height: 230px;
+            transform: translateY(-50%) rotate(0rad);
+            transform-origin: 35% 50%;
+        }
+
+        @media (max-width: 576px) {
+            .archery {
+                left: 20px !important;
+                top: 333.5px;
+                width: 120px;
+                height: 110px;
+                transform: translateY(-50%) rotate(0.203176rad);
+                transform-origin: 35% 50%;
+            }
+        }
+    </style>
+</head>
+
+<body class="w-full h-screen overflow-hidden">
+
+    <div id="app" class="w-full h-screen">
+        <div class="relative w-full h-screen overflow-hidden select-none touch-none game-container">
+
+            <!-- TOP HUD SCORE BAR -->
+            <div class="absolute top-3 inset-x-3 sm:top-5 sm:inset-x-6 z-40 flex items-center justify-between pointer-events-none"
+                style="padding-top: env(safe-area-inset-top);">
+
+                <!-- Score Card -->
+                <div
+                    class="bg-white/70 backdrop-blur-md px-4 py-2 sm:px-6 sm:py-2.5 rounded-2xl shadow-sm border border-white/70 flex items-center gap-3 pointer-events-auto">
+                    <div
+                        class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-pink-500/10 flex items-center justify-center text-pink-600 text-lg sm:text-xl font-bold">
+                        🎯
+                    </div>
+                    <div>
+                        <div class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">Score
+                        </div>
+                        <div id="hud-score" class="text-lg sm:text-2xl font-extrabold text-gray-800 leading-tight">0
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timer Card -->
+                <div
+                    class="bg-white/70 backdrop-blur-md px-4 py-2 sm:px-6 sm:py-2.5 rounded-2xl shadow-sm border border-white/70 flex items-center gap-3 pointer-events-auto">
+                    <div
+                        class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500 text-lg sm:text-xl">
+                        ⏱️
+                    </div>
+                    <div>
+                        <div class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">Time
+                            Left</div>
+                        <div id="hud-timer" class="text-lg sm:text-2xl font-extrabold text-gray-800 leading-tight">45s
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls (Sound & Restart) -->
+                <div class="flex items-center gap-2 pointer-events-auto">
+                    <div
+                        class="hidden md:flex bg-white/70 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-sm border border-white/70 items-center gap-2 text-xs font-bold text-amber-700">
+                        <span>🏆 Best:</span>
+                        <span id="hud-highscore">0</span>
+                    </div>
+                    <button id="sound-btn"
+                        class="bg-white/70 hover:bg-white/90 backdrop-blur-md p-2.5 sm:p-3 rounded-2xl shadow-sm border border-white/70 text-pink-600 transition-all active:scale-95"
+                        title="Toggle Sound">
+                        <svg id="sound-icon-on" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z">
+                            </path>
+                        </svg>
+                        <svg id="sound-icon-off" class="w-5 h-5 hidden" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2">
+                            </path>
+                        </svg>
+                    </button>
+                    <button id="reset-btn"
+                        class="bg-white/70 hover:bg-white/90 backdrop-blur-md p-2.5 sm:p-3 rounded-2xl shadow-sm border border-white/70 text-pink-600 transition-all active:scale-95"
+                        title="Restart Game">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Aim Trajectory Canvas / SVG Layer -->
+            <svg id="aim-svg" class="absolute inset-0 w-full h-full pointer-events-none z-10">
+                <line id="aim-line" class="aim-line" x1="0" y1="0" x2="0" y2="0" stroke="rgba(236, 72, 153, 0.85)"
+                    stroke-width="3" opacity="0" />
+            </svg>
+
+            <!-- REALISTIC RECURVE BOW COMPONENT -->
+            <div id="bow-wrapper"
+                class="absolute pointer-events-none z-20 flex items-center justify-center bow-shadow archery">
+
+                <svg id="bow-svg" viewBox="0 0 170 230" class="w-full h-full overflow-visible">
+                    <defs>
+                        <!-- Rich Polished Wood Grain Riser Gradient -->
+                        <linearGradient id="wood-riser" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#421606" />
+                            <stop offset="30%" stop-color="#7c2d12" />
+                            <stop offset="65%" stop-color="#9a3412" />
+                            <stop offset="85%" stop-color="#b45309" />
+                            <stop offset="100%" stop-color="#3b1202" />
+                        </linearGradient>
+
+                        <!-- Laminated Carbon/Fiberglass Limb Gradient -->
+                        <linearGradient id="limb-carbon" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#1e293b" />
+                            <stop offset="40%" stop-color="#475569" />
+                            <stop offset="80%" stop-color="#334155" />
+                            <stop offset="100%" stop-color="#0f172a" />
+                        </linearGradient>
+
+                        <!-- Steel Broadhead Blade Metallic Gradient -->
+                        <linearGradient id="steel-blade" x1="0%" y1="0%" x2="100%" y2="50%">
+                            <stop offset="0%" stop-color="#94a3b8" />
+                            <stop offset="35%" stop-color="#f8fafc" />
+                            <stop offset="70%" stop-color="#cbd5e1" />
+                            <stop offset="100%" stop-color="#475569" />
+                        </linearGradient>
+
+                        <!-- Carbon Fiber Arrow Shaft Gradient -->
+                        <linearGradient id="carbon-shaft" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#334155" />
+                            <stop offset="50%" stop-color="#1e293b" />
+                            <stop offset="100%" stop-color="#0f172a" />
+                        </linearGradient>
+
+                        <!-- Feather Fletching Crimson Gradient -->
+                        <linearGradient id="feather-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#fb7185" />
+                            <stop offset="50%" stop-color="#e11d48" />
+                            <stop offset="100%" stop-color="#9f1239" />
+                        </linearGradient>
+                    </defs>
+
+                    <!-- UPPER RECURVE LIMB (Flexes on pull) -->
+                    <path id="upper-limb"
+                        d="M 50 115 C 65 80, 55 45, 18 12 C 12 7, 20 4, 28 10 C 65 40, 75 80, 58 115 Z"
+                        fill="url(#limb-carbon)" stroke="#0f172a" stroke-width="0.5" />
+                    <circle cx="20" cy="10" r="4" fill="#0f172a" />
+
+                    <!-- LOWER RECURVE LIMB -->
+                    <path id="lower-limb"
+                        d="M 50 115 C 65 150, 55 185, 18 218 C 12 223, 20 226, 28 220 C 65 190, 75 150, 58 115 Z"
+                        fill="url(#limb-carbon)" stroke="#0f172a" stroke-width="0.5" />
+                    <circle cx="20" cy="220" r="4" fill="#0f172a" />
+
+                    <!-- CENTER WOODEN RISER & ARROW SHELF -->
+                    <path d="M 50 75 C 68 90, 68 140, 50 155 C 42 147, 38 133, 42 115 C 38 97, 42 83, 50 75 Z"
+                        fill="url(#wood-riser)" stroke="#270901" stroke-width="1.5" />
+                    <!-- Stitched Leather Grip Wrap -->
+                    <rect x="42" y="99" width="18" height="32" rx="4" fill="#78350f" stroke="#451a03"
+                        stroke-width="1.5" />
+                    <line x1="42" y1="107" x2="60" y2="107" stroke="#fde047" stroke-width="1" stroke-dasharray="2 2" />
+                    <line x1="42" y1="115" x2="60" y2="115" stroke="#fde047" stroke-width="1" stroke-dasharray="2 2" />
+                    <line x1="42" y1="123" x2="60" y2="123" stroke="#fde047" stroke-width="1" stroke-dasharray="2 2" />
+
+                    <!-- DYNAMIC BOWSTRING (Pulls back to notch point) -->
+                    <path id="bow-string" d="M 20 10 L 20 115 L 20 220" stroke="#ffffff" stroke-width="2.5" fill="none"
+                        stroke-linecap="round" filter="drop-shadow(0 0 2px rgba(255,255,255,0.8))" />
+                    <!-- String Nocking Grip Tab -->
+                    <circle id="nock-tab" cx="20" cy="115" r="4" fill="#fde047" stroke="#b45309" stroke-width="1" />
+
+                    <!-- LOADED REALISTIC HUNTING ARROW (Translates backward when drawn) -->
+                    <g id="loaded-arrow" transform="translate(0, 0)">
+                        <!-- Carbon Shaft -->
+                        <rect x="-40" y="113" width="150" height="4" rx="1.5" fill="url(#carbon-shaft)" stroke="#475569"
+                            stroke-width="0.5" />
+
+                        <!-- White Ring Wraps -->
+                        <rect x="-20" y="112.5" width="3" height="5" fill="#f8fafc" />
+                        <rect x="-13" y="112.5" width="2" height="5" fill="#f8fafc" />
+
+                        <!-- Feather Fletchings -->
+                        <path d="M -40 113 L -18 101 C -12 101, -7 106, -7 113 Z" fill="url(#feather-grad)" />
+                        <path d="M -40 117 L -18 129 C -12 129, -7 124, -7 117 Z" fill="url(#feather-grad)" />
+                        <path d="M -34 115 L -14 109 C -10 111, -10 115, -10 115 Z" fill="#f8fafc" opacity="0.9" />
+
+                        <!-- Arrow Nock Groove attached to string -->
+                        <path d="M -40 113 L -45 110 L -45 120 L -40 117 Z" fill="#ef4444" />
+
+                        <!-- Broadhead Tip -->
+                        <polygon points="110,108 140,115 110,122 114,115" fill="url(#steel-blade)" stroke="#1e293b"
+                            stroke-width="0.8" />
+                        <line x1="108" y1="115" x2="140" y2="115" stroke="#f8fafc" stroke-width="1" />
+                    </g>
+                </svg>
+            </div>
+
+            <!-- Container for Flying Arrows -->
+            <div id="arrows-container" class="absolute inset-0 pointer-events-none z-15"></div>
+
+            <!-- Container for Dynamic Balloons -->
+            <div id="balloons-container" class="absolute inset-0 z-10 overflow-hidden"></div>
+
+            <!-- Floating Pop Scores & FX -->
+            <div id="fx-container" class="absolute inset-0 pointer-events-none z-25"></div>
+
+            <!-- Drag & Aim Helper Toast -->
+            <div id="instruction-toast"
+                class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center transition-opacity duration-500">
+                <div
+                    class="bg-white/85 backdrop-blur-md px-6 py-3 rounded-full shadow-lg text-gray-800 text-xs sm:text-sm font-bold flex items-center gap-2.5 border border-white/80">
+                    <span class="text-lg">🏹</span>
+                    <span>Touch & pull BACKWARD to draw string & shoot!</span>
+                </div>
+            </div>
+
+            <!-- GAME OVER SCORECARD MODAL -->
+            <div id="scorecard-modal"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md opacity-0 pointer-events-none transition-all duration-500 p-4">
+                <div
+                    class="bg-white/95 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl border border-white/80 transform scale-90 transition-all duration-500 id-modal-card">
+
+                    <div
+                        class="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-tr from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-pink-500/30 text-3xl sm:text-4xl text-white">
+                        🏆
+                    </div>
+
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-gray-800 mb-1"
+                        style="font-family: 'Cinzel', serif;">Match Complete</h2>
+                    <p class="text-xs sm:text-sm text-gray-500 mb-5">Archery Master Performance Scorecard</p>
+
+                    <!-- Score Breakdown Card -->
+                    <div class="bg-pink-50/70 rounded-2xl p-4 sm:p-5 border border-pink-100 mb-6 space-y-3">
+                        <div>
+                            <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Final Score</div>
+                            <div id="final-score" class="text-4xl sm:text-5xl font-black text-pink-600">0</div>
+                            <div id="new-highscore-badge"
+                                class="hidden inline-block mt-1.5 px-3.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold shimmer">
+                                🎉 New Personal High Score!
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2 pt-3 border-t border-pink-100/80">
+                            <div class="bg-white/85 p-2 sm:p-2.5 rounded-xl border border-white">
+                                <div class="text-[10px] font-bold text-gray-400 uppercase">Popped</div>
+                                <div id="stat-popped" class="text-sm sm:text-base font-bold text-gray-800">0</div>
+                            </div>
+                            <div class="bg-white/85 p-2 sm:p-2.5 rounded-xl border border-white">
+                                <div class="text-[10px] font-bold text-gray-400 uppercase">Shots</div>
+                                <div id="stat-shots" class="text-sm sm:text-base font-bold text-gray-800">0</div>
+                            </div>
+                            <div class="bg-white/85 p-2 sm:p-2.5 rounded-xl border border-white">
+                                <div class="text-[10px] font-bold text-gray-400 uppercase">Accuracy</div>
+                                <div id="stat-accuracy" class="text-sm sm:text-base font-bold text-gray-800">0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="play-again-btn"
+                        class="w-full py-3.5 px-6 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-bold text-base rounded-2xl shadow-lg shadow-pink-500/30 transform active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <span>Play Again</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </button>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- GAME CONSTANTS & STATE ---
+        const GAME_DURATION = 45;
+        let timeLeft = GAME_DURATION;
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('archery_highscore') || '0', 10);
+        let totalShots = 0;
+        let balloonsPopped = 0;
+
+        let isPlaying = false;
+        let soundEnabled = true;
+        let timerInterval = null;
+
+        // Bow Dragging State
+        let isDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let currentMouseX = 0, currentMouseY = 0;
+        let bowX = 75, bowY = window.innerHeight / 2;
+        let bowAngle = 0;
+        let pullDistance = 0;
+        const MAX_PULL = 70; // Extended max pull distance for realistic draw
+
+        let arrows = [];
+        let balloons = [];
+
+        // DOM References
+        const bowWrapper = document.getElementById('bow-wrapper');
+        const bowString = document.getElementById('bow-string');
+        const nockTab = document.getElementById('nock-tab');
+        const loadedArrow = document.getElementById('loaded-arrow');
+        const upperLimb = document.getElementById('upper-limb');
+        const lowerLimb = document.getElementById('lower-limb');
+        const aimLine = document.getElementById('aim-line');
+        const balloonsContainer = document.getElementById('balloons-container');
+        const arrowsContainer = document.getElementById('arrows-container');
+        const fxContainer = document.getElementById('fx-container');
+
+        const hudScore = document.getElementById('hud-score');
+        const hudTimer = document.getElementById('hud-timer');
+        const hudHighscore = document.getElementById('hud-highscore');
+
+        const scorecardModal = document.getElementById('scorecard-modal');
+        const finalScoreEl = document.getElementById('final-score');
+        const statPoppedEl = document.getElementById('stat-popped');
+        const statShotsEl = document.getElementById('stat-shots');
+        const statAccuracyEl = document.getElementById('stat-accuracy');
+        const newHighscoreBadge = document.getElementById('new-highscore-badge');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const soundBtn = document.getElementById('sound-btn');
+        const soundIconOn = document.getElementById('sound-icon-on');
+        const soundIconOff = document.getElementById('sound-icon-off');
+        const instructionToast = document.getElementById('instruction-toast');
+
+        hudHighscore.innerText = highScore.toLocaleString();
+
+        // Web Audio Synthesizer
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playPopSound(isBonus = false) {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = isBonus ? 'triangle' : 'sine';
+                const startFreq = isBonus ? 650 : 480;
+                const endFreq = isBonus ? 1300 : 85;
+
+                osc.frequency.setValueAtTime(startFreq, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(endFreq, ctx.currentTime + 0.09);
+
+                gain.gain.setValueAtTime(0.55, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.09);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.09);
+            } catch (e) { }
+        }
+
+        function playReleaseSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.06);
+
+                gain.gain.setValueAtTime(0.35, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.06);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.06);
+            } catch (e) { }
+        }
+
+        function playGameOverSound() {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                const notes = [440, 349.23, 293.66, 587.33];
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.12 + 0.35);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + i * 0.12);
+                    osc.stop(ctx.currentTime + i * 0.12 + 0.35);
+                });
+            } catch (e) { }
+        }
+
+        // Balloon Variations
+        const BALLOON_TYPES = [
+            { type: 'standard', fill: '#f472b6', points: 100, bonusTime: 0, speedMult: 1.0, weight: 50 },
+            { type: 'rose', fill: '#fb7185', points: 150, bonusTime: 0, speedMult: 1.2, weight: 25 },
+            { type: 'purple', fill: '#c084fc', points: 200, bonusTime: 0, speedMult: 1.35, weight: 15 },
+            { type: 'golden', fill: '#fbbf24', points: 400, bonusTime: 0, speedMult: 1.7, weight: 6 },
+            { type: 'time', fill: '#34d399', points: 100, bonusTime: 3, speedMult: 1.15, weight: 4 }
+        ];
+
+        function getRandomBalloonType() {
+            const rand = Math.random() * 100;
+            let cum = 0;
+            for (let t of BALLOON_TYPES) {
+                cum += t.weight;
+                if (rand <= cum) return t;
+            }
+            return BALLOON_TYPES[0];
+        }
+
+        function spawnBalloon(isInitial = false) {
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+
+            const minX = Math.max(windowWidth * 0.32, 220);
+            const maxX = windowWidth - 75;
+            const spawnX = minX + Math.random() * (maxX - minX);
+
+            const spawnY = isInitial
+                ? 120 + Math.random() * (windowHeight - 240)
+                : windowHeight + 90;
+
+            const balloonType = getRandomBalloonType();
+            const id = Date.now() + Math.random();
+
+            const balloonEl = document.createElement('div');
+            balloonEl.className = 'absolute pointer-events-none transition-transform duration-75';
+            balloonEl.style.left = `${spawnX}px`;
+            balloonEl.style.top = `${spawnY}px`;
+            balloonEl.style.transform = 'translate(-50%, -100%)';
+
+            const isGolden = balloonType.type === 'golden';
+            const isTimeBonus = balloonType.type === 'time';
+
+            balloonEl.innerHTML = `
+        <div class="relative flex flex-col items-center">
+          <svg width="68" height="78" viewBox="0 0 65 75" class="drop-shadow-md">
+            <defs>
+              <radialGradient id="balloon-grad-${id}" cx="35%" cy="30%" r="65%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.75"/>
+                <stop offset="35%" stop-color="${balloonType.fill}"/>
+                <stop offset="100%" stop-color="${balloonType.fill}"/>
+              </radialGradient>
+            </defs>
+            <path d="M 32.5 5 C 50 5, 62 20, 62 42 C 62 60, 42 70, 32.5 70 C 23 70, 3 60, 3 42 C 3 20, 15 5, 32.5 5 Z" fill="url(#balloon-grad-${id})" />
+            <polygon points="32.5,69 28,74 37,74" fill="${balloonType.fill}" />
+            <ellipse cx="22" cy="22" rx="6" ry="12" fill="#ffffff" opacity="0.45" transform="rotate(-25 22 22)" />
+            ${isGolden ? '<text x="32.5" y="44" font-size="20" text-anchor="middle" fill="#fff">⭐</text>' : ''}
+            ${isTimeBonus ? '<text x="32.5" y="44" font-size="14" font-weight="extrabold" text-anchor="middle" fill="#fff">+3s</text>' : ''}
+          </svg>
+          <div style="width: 1px; height: 35px; background: linear-gradient(rgb(187, 187, 187), transparent); margin: 0px auto;"></div>
+        </div>
+      `;
+
+            balloonsContainer.appendChild(balloonEl);
+
+            balloons.push({
+                id: id,
+                el: balloonEl,
+                x: spawnX,
+                y: spawnY - 50,
+                radius: 34,
+                baseX: spawnX,
+                baseY: spawnY,
+                type: balloonType,
+                speed: (65 + Math.random() * 45) * balloonType.speedMult,
+                seed: Math.random() * 100,
+                isPopped: false
+            });
+        }
+
+        function maintainBalloonCount() {
+            const targetCount = 7 + Math.floor(window.innerWidth / 280);
+            while (balloons.filter(b => !b.isPopped).length < targetCount) {
+                spawnBalloon(false);
+            }
+        }
+
+        function positionBow() {
+            const windowHeight = window.innerHeight;
+            const windowWidth = window.innerWidth;
+
+            bowX = Math.min(90, windowWidth * 0.16);
+            bowY = windowHeight / 2;
+
+            bowWrapper.style.left = `${bowX - 55}px`;
+            bowWrapper.style.top = `${bowY}px`;
+        }
+
+        // Dynamic Bow & Arrow Drawing Back Graphics
+        function updateBowGraphics() {
+            bowWrapper.style.transform = `translateY(-50%) rotate(${bowAngle}rad)`;
+
+            // Pull back string notch & nock tab backward
+            const notchX = 20 - pullDistance;
+            bowString.setAttribute('d', `M 20 10 L ${notchX} 115 L 20 220`);
+            nockTab.setAttribute('cx', notchX);
+
+            // Loaded arrow moves BACKWARD dynamically with user's draw pull
+            loadedArrow.setAttribute('transform', `translate(${-pullDistance}, 0)`);
+
+            // Limb flexing (Limb tips curve inward as string is pulled back)
+            const flexX = pullDistance * 0.18;
+            upperLimb.setAttribute('d', `M 50 115 C ${65 - flexX} 80, ${55 - flexX} 45, 18 10 C 12 7, 20 4, 28 10 C ${65 - flexX} 40, ${75 - flexX} 80, 58 115 Z`);
+            lowerLimb.setAttribute('d', `M 50 115 C ${65 - flexX} 150, ${55 - flexX} 185, 18 218 C 12 223, 20 226, 28 220 C ${65 - flexX} 190, ${75 - flexX} 150, 58 115 Z`);
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            hudTimer.classList.remove('time-warning');
+            hudTimer.innerText = `${timeLeft}s`;
+
+            timerInterval = setInterval(() => {
+                if (!isPlaying) return;
+                timeLeft--;
+                hudTimer.innerText = `${timeLeft}s`;
+
+                if (timeLeft <= 10) {
+                    hudTimer.classList.add('time-warning');
+                }
+
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function startNewGame() {
+            score = 0;
+            totalShots = 0;
+            balloonsPopped = 0;
+            timeLeft = GAME_DURATION;
+            isPlaying = true;
+
+            hudScore.innerText = '0';
+            scorecardModal.classList.add('opacity-0', 'pointer-events-none');
+            scorecardModal.querySelector('.id-modal-card').classList.remove('scale-100');
+            scorecardModal.querySelector('.id-modal-card').classList.add('scale-90');
+            newHighscoreBadge.classList.add('hidden');
+
+            balloonsContainer.innerHTML = '';
+            arrowsContainer.innerHTML = '';
+            fxContainer.innerHTML = '';
+            balloons = [];
+            arrows = [];
+
+            for (let i = 0; i < 8; i++) {
+                spawnBalloon(true);
+            }
+
+            startTimer();
+        }
+
+        function endGame() {
+            isPlaying = false;
+            clearInterval(timerInterval);
+            playGameOverSound();
+
+            let isNewRecord = false;
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('archery_highscore', highScore);
+                hudHighscore.innerText = highScore.toLocaleString();
+                isNewRecord = true;
+            }
+
+            finalScoreEl.innerText = score.toLocaleString();
+            statPoppedEl.innerText = balloonsPopped;
+            statShotsEl.innerText = totalShots;
+
+            const accuracy = totalShots > 0 ? Math.round((balloonsPopped / totalShots) * 100) : 0;
+            statAccuracyEl.innerText = `${accuracy}%`;
+
+            if (isNewRecord && score > 0) {
+                newHighscoreBadge.classList.remove('hidden');
+                if (typeof confetti === 'function') {
+                    confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+                }
+            }
+
+            scorecardModal.classList.remove('opacity-0', 'pointer-events-none');
+            scorecardModal.querySelector('.id-modal-card').classList.remove('scale-90');
+            scorecardModal.querySelector('.id-modal-card').classList.add('scale-100');
+        }
+
+        // Pointer Event Handling - Dual Slingshot / Direct Pull Logic
+        function onPointerDown(e) {
+            if (!isPlaying) return;
+            isDragging = true;
+            dragStartX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+            dragStartY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+            currentMouseX = dragStartX;
+            currentMouseY = dragStartY;
+
+            instructionToast.style.opacity = '0';
+        }
+
+        function onPointerMove(e) {
+            if (!isDragging || !isPlaying) return;
+            currentMouseX = e.clientX || (e.touches && e.touches[0].clientX) || currentMouseX;
+            currentMouseY = e.clientY || (e.touches && e.touches[0].clientY) || currentMouseY;
+
+            // Vector from Bow Center to Drag Pointer
+            const dx = currentMouseX - bowX;
+            const dy = currentMouseY - bowY;
+            const dist = Math.hypot(dx, dy);
+
+            // Aim direction: Aim towards pointer if dragging ahead, or aim opposite if pulling back
+            if (dx < 0) {
+                // Dragging BACKWARDS (Slingshot / Natural Draw pull)
+                bowAngle = Math.atan2(-dy, -dx); // Aim forward right
+                pullDistance = Math.min(MAX_PULL, dist * 0.5); // Pull arrow back
+            } else {
+                // Dragging FORWARD (Direct Aiming)
+                bowAngle = Math.atan2(dy, dx);
+                pullDistance = Math.min(MAX_PULL, Math.max(15, dist * 0.35));
+            }
+
+            // Render Trajectory Aim Line
+            aimLine.setAttribute('x1', bowX);
+            aimLine.setAttribute('y1', bowY);
+            const aimLength = 1000;
+            aimLine.setAttribute('x2', bowX + Math.cos(bowAngle) * aimLength);
+            aimLine.setAttribute('y2', bowY + Math.sin(bowAngle) * aimLength);
+            aimLine.setAttribute('opacity', '1');
+
+            updateBowGraphics();
+        }
+
+        function onPointerUp(e) {
+            if (!isDragging || !isPlaying) return;
+            isDragging = false;
+
+            aimLine.setAttribute('opacity', '0');
+
+            if (pullDistance > 12) {
+                shootArrow(bowAngle, pullDistance);
+                playReleaseSound();
+            }
+
+            pullDistance = 0;
+            updateBowGraphics();
+        }
+
+        // REALISTIC ARROW CREATION & FLIGHT
+        function shootArrow(angle, power) {
+            totalShots++;
+            const speed = 22 + (power / MAX_PULL) * 26;
+            const arrowEl = document.createElement('div');
+            arrowEl.className = 'absolute pointer-events-none z-15 bow-shadow';
+            arrowEl.style.width = '140px';
+            arrowEl.style.height = '20px';
+            arrowEl.style.transformOrigin = '5px 10px';
+
+            arrowEl.innerHTML = `
+        <svg width="140" height="20" viewBox="0 0 140 20" class="overflow-visible">
+          <defs>
+            <linearGradient id="flight-steel" x1="0%" y1="0%" x2="100%" y2="50%">
+              <stop offset="0%" stop-color="#94a3b8" />
+              <stop offset="50%" stop-color="#f8fafc" />
+              <stop offset="100%" stop-color="#334155" />
+            </linearGradient>
+            <linearGradient id="flight-feather" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#fb7185" />
+              <stop offset="100%" stop-color="#be123c" />
+            </linearGradient>
+          </defs>
+
+          <!-- Carbon Shaft -->
+          <rect x="0" y="8.5" width="110" height="3" rx="1.5" fill="#1e293b" stroke="#475569" stroke-width="0.5" />
+          
+          <!-- White Shaft Ring Wraps -->
+          <rect x="15" y="8" width="3" height="4" fill="#f8fafc" />
+          <rect x="22" y="8" width="2" height="4" fill="#f8fafc" />
+
+          <!-- Feather Fletchings -->
+          <path d="M 0 8.5 L 18 1 C 23 1, 26 5, 26 8.5 Z" fill="url(#flight-feather)" />
+          <path d="M 0 11.5 L 18 19 C 23 19, 26 15, 26 11.5 Z" fill="url(#flight-feather)" />
+          <path d="M 4 10 L 20 6 C 24 7.5, 24 10, 24 10 Z" fill="#f8fafc" opacity="0.9" />
+
+          <!-- Arrow Nock Groove -->
+          <path d="M 0 8.5 L -5 6 L -5 14 L 0 11.5 Z" fill="#ef4444" />
+
+          <!-- Broadhead Steel Blade Tip -->
+          <polygon points="110,4 138,10 110,16 114,10" fill="url(#flight-steel)" stroke="#0f172a" stroke-width="0.8" />
+          <line x1="108" y1="10" x2="138" y2="10" stroke="#ffffff" stroke-width="1" />
+        </svg>
+      `;
+
+            arrowsContainer.appendChild(arrowEl);
+
+            const startX = bowX + Math.cos(angle) * 40;
+            const startY = bowY + Math.sin(angle) * 40;
+
+            arrows.push({
+                el: arrowEl,
+                x: startX,
+                y: startY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                angle: angle,
+                life: 0
+            });
+        }
+
+        function showScorePopEffect(x, y, text, color = '#f472b6') {
+            const popEl = document.createElement('div');
+            popEl.className = 'absolute font-extrabold text-xl sm:text-2xl score-pop drop-shadow-md pointer-events-none';
+            popEl.style.left = `${x}px`;
+            popEl.style.top = `${y}px`;
+            popEl.style.color = color;
+            popEl.innerText = text;
+            fxContainer.appendChild(popEl);
+
+            setTimeout(() => popEl.remove(), 850);
+        }
+
+        function popBalloon(balloon) {
+            if (balloon.isPopped) return;
+            balloon.isPopped = true;
+            balloonsPopped++;
+
+            score += balloon.type.points;
+            hudScore.innerText = score.toLocaleString();
+
+            if (balloon.type.bonusTime > 0) {
+                timeLeft += balloon.type.bonusTime;
+                hudTimer.innerText = `${timeLeft}s`;
+                showScorePopEffect(balloon.x, balloon.y - 20, `+${balloon.type.bonusTime}s Time!`, '#10b981');
+            } else {
+                showScorePopEffect(balloon.x, balloon.y - 20, `+${balloon.type.points}`, balloon.type.fill);
+            }
+
+            playPopSound(balloon.type.type === 'golden' || balloon.type.type === 'time');
+
+            balloon.el.classList.add('balloon-pop');
+            setTimeout(() => {
+                balloon.el.remove();
+            }, 250);
+
+            maintainBalloonCount();
+        }
+
+        // Main Game Animation Loop
+        let lastTime = performance.now();
+        function gameLoop(now) {
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+
+            if (isPlaying) {
+                for (let i = balloons.length - 1; i >= 0; i--) {
+                    const balloon = balloons[i];
+                    if (!balloon.isPopped) {
+                        balloon.baseY -= balloon.speed * dt;
+                        balloon.seed += dt * 2.2;
+                        const swayX = Math.sin(balloon.seed) * 16;
+
+                        balloon.x = balloon.baseX + swayX;
+                        balloon.y = balloon.baseY - 50;
+
+                        balloon.el.style.left = `${balloon.x}px`;
+                        balloon.el.style.top = `${balloon.baseY}px`;
+
+                        if (balloon.baseY < -90) {
+                            balloon.el.remove();
+                            balloons.splice(i, 1);
+                        }
+                    }
+                }
+                maintainBalloonCount();
+            }
+
+            // Update Flying Arrows
+            for (let i = arrows.length - 1; i >= 0; i--) {
+                const arrow = arrows[i];
+                arrow.x += arrow.vx;
+                arrow.y += arrow.vy;
+                arrow.life += dt;
+
+                arrow.el.style.left = `${arrow.x}px`;
+                arrow.el.style.top = `${arrow.y}px`;
+                arrow.el.style.transform = `translate(0, -50%) rotate(${arrow.angle}rad)`;
+
+                const tipX = arrow.x + Math.cos(arrow.angle) * 135;
+                const tipY = arrow.y + Math.sin(arrow.angle) * 135;
+
+                if (isPlaying) {
+                    balloons.forEach(balloon => {
+                        if (!balloon.isPopped) {
+                            const dist = Math.hypot(tipX - balloon.x, tipY - balloon.y);
+                            if (dist < balloon.radius + 16) {
+                                popBalloon(balloon);
+                            }
+                        }
+                    });
+                }
+
+                if (
+                    arrow.x > window.innerWidth + 150 ||
+                    arrow.y < -120 ||
+                    arrow.y > window.innerHeight + 120 ||
+                    arrow.life > 4
+                ) {
+                    arrow.el.remove();
+                    arrows.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Attach Listeners
+        window.addEventListener('mousedown', onPointerDown);
+        window.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('mouseup', onPointerUp);
+
+        window.addEventListener('touchstart', onPointerDown, { passive: true });
+        window.addEventListener('touchmove', onPointerMove, { passive: true });
+        window.addEventListener('touchend', onPointerUp);
+
+        window.addEventListener('resize', positionBow);
+
+        playAgainBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startNewGame();
+        });
+
+        resetBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startNewGame();
+        });
+
+        soundBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            soundEnabled = !soundEnabled;
+            if (soundEnabled) {
+                soundIconOn.classList.remove('hidden');
+                soundIconOff.classList.add('hidden');
+            } else {
+                soundIconOn.classList.add('hidden');
+                soundIconOff.classList.remove('hidden');
+            }
+        });
+
+        // Start App
+        positionBow();
+        startNewGame();
+        requestAnimationFrame(gameLoop);
+
+    </script>
+</body>
+
+</html>
